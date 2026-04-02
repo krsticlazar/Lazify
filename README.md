@@ -1,56 +1,77 @@
 # Lazify
 
-Lazify is a desktop app for converting common document and file formats into Markdown.
+Lazify is a lightweight Windows desktop app that converts `PDF`, `DOCX`, and `PPTX` files into Markdown.
 
-## Features
+## What It Does
 
-- Drag and drop or browse files from a native Windows desktop UI
-- Convert `PDF`, `DOCX`, `XLSX`, `PPTX`, `HTML`, `CSV`, `JSON`, `XML`, `JPG`, `JPEG`, and `PNG`
-- Run conversions in the background so the UI stays responsive
-- Use `Convert All and Save` to automatically write Markdown files next to the original files
-- Build a single-file Windows executable with PyInstaller
+- Accepts `PDF`, `DOCX`, and `PPTX` files
+- Lets you drag and drop files or add them manually
+- Converts files in the background
+- Automatically saves the Markdown output next to the original file
+- Creates safe filenames such as `file.md`, `file (1).md`, and so on when needed
 
-## Project Structure
+## Download And Install
 
-```text
-Lazify/
-├── README.md
-├── assets/
-│   └── lazify.ico
-├── scripts/
-│   ├── build.bat
-│   └── requirements.txt
-└── src/
-    ├── main.py
-    └── lazify/
-        ├── app.py
-        ├── converter.py
-        ├── file_item.py
-        ├── main.py
-        ├── resources.py
-        └── ui/
-```
+1. Open the repository on GitHub.
+2. Go to the **Releases** page.
+3. Download `Lazify-Setup.exe`.
+4. Run the installer.
+5. Choose the folder where you want Lazify to be installed.
+6. Finish the setup wizard.
 
-## Run From Source
+After installation:
+
+- Lazify is added to the **Start Menu**
+- A **Lazify** program folder is created
+- You can optionally create a desktop shortcut during setup
+
+## How To Use
+
+1. Open Lazify from the Start Menu or desktop shortcut.
+2. Drag files into the app or click **Add Files**.
+3. Click **Convert All and Save**.
+4. The generated Markdown files are saved automatically in the same folder as the original files.
+
+Example:
+
+- `Report.pdf` becomes `Report.md`
+- If `Report.md` already exists, Lazify saves `Report (1).md`
+
+## Supported File Types
+
+- `.pdf`
+- `.docx`
+- `.pptx`
+
+## Installer Output
+
+The GitHub Release should publish:
+
+- `Lazify-Setup.exe`
+
+This is the file end users should download.
+
+## For Development
+
+Install dependencies:
 
 ```bat
 python -m pip install -r scripts\requirements.txt
+```
+
+Run from source:
+
+```bat
 python src\main.py
 ```
 
-## Build The EXE
+Build the app package and installer:
 
 ```bat
 scripts\build.bat
 ```
 
-After a successful build, the executable is created here:
+Build outputs:
 
-```text
-dist\Lazify.exe
-```
-
-## Notes
-
-- `scripts\build.bat` automatically syncs the root `lazify.ico` into `assets\lazify.ico` before packaging.
-- The packaged app uses the same Lazify icon for both the executable and the Tkinter window.
+- App package: `dist\Lazify\Lazify.exe`
+- Installer: `dist\installer\Lazify-Setup.exe`

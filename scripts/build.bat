@@ -3,6 +3,8 @@ setlocal
 
 cd /d "%~dp0\.."
 set "ICON_PATH=%CD%\assets\lazify.ico"
+set "ISCC_EXE=%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"
+if not exist "%ISCC_EXE%" set "ISCC_EXE=%ProgramFiles%\Inno Setup 6\ISCC.exe"
 
 echo Installing dependencies...
 python -m pip install -r scripts\requirements.txt
@@ -15,11 +17,10 @@ if exist dist rmdir /s /q dist
 
 if exist lazify.ico copy /y lazify.ico assets\lazify.ico >nul
 
-echo Building Lazify.exe...
+echo Building application package...
 python -m PyInstaller ^
   --noconfirm ^
   --clean ^
-  --onefile ^
   --windowed ^
   --name Lazify ^
   --paths=src ^
@@ -27,12 +28,24 @@ python -m PyInstaller ^
   --icon="%ICON_PATH%" ^
   --add-data "%ICON_PATH%;assets" ^
   --hidden-import=tkinterdnd2 ^
-  --collect-all markitdown ^
-  --collect-all magika ^
+  --exclude-module numpy ^
+  --exclude-module pygame ^
+  --exclude-module pyreadline3 ^
   --collect-all tkinterdnd2 ^
   src\main.py
 if errorlevel 1 exit /b 1
 
-echo Build complete. Output available in dist\Lazify.exe
+if exist "%ISCC_EXE%" (
+  echo Building installer...
+  "%ISCC_EXE%" installer\Lazify.iss
+  if errorlevel 1 exit /b 1
+) else (
+  echo Inno Setup was not found. Application package was built, but the installer was skipped.
+)
+
+echo Build complete.
+echo App package: dist\Lazify\Lazify.exe
+if exist dist\installer\Lazify-Setup.exe echo Installer: dist\installer\Lazify-Setup.exe
+
 endlocal
 exit /b 0

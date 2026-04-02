@@ -31,16 +31,7 @@ from lazify.ui.styles import (
 ICON_BY_EXTENSION = {
     ".pdf": "PDF",
     ".docx": "DOC",
-    ".xlsx": "XLS",
     ".pptx": "PPT",
-    ".html": "HTML",
-    ".htm": "HTML",
-    ".csv": "CSV",
-    ".json": "JSON",
-    ".xml": "XML",
-    ".jpg": "IMG",
-    ".jpeg": "IMG",
-    ".png": "IMG",
 }
 
 STATUS_TEXT = {
