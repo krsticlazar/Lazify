@@ -7,7 +7,7 @@ Lazify is a desktop app for converting common document and file formats into Mar
 - Drag and drop or browse files from a native Windows desktop UI
 - Convert `PDF`, `DOCX`, `XLSX`, `PPTX`, `HTML`, `CSV`, `JSON`, `XML`, `JPG`, `JPEG`, and `PNG`
 - Run conversions in the background so the UI stays responsive
-- Save each Markdown result individually or save all converted files at once
+- Use `Convert All and Save` to automatically write Markdown files next to the original files
 - Build a single-file Windows executable with PyInstaller
 
 ## Project Structure

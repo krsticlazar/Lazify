@@ -59,7 +59,7 @@ STATUS_COLORS = {
 
 
 class FileRow(tk.Frame):
-    def __init__(self, master: tk.Misc, item: FileItem, on_remove, on_save) -> None:
+    def __init__(self, master: tk.Misc, item: FileItem, on_remove) -> None:
         super().__init__(
             master,
             bg=CONTENT_BACKGROUND,
@@ -70,7 +70,6 @@ class FileRow(tk.Frame):
         )
         self.item = item
         self.on_remove = on_remove
-        self.on_save = on_save
         self.is_busy = False
         self.tooltip_text = ""
         self.tooltip_window: tk.Toplevel | None = None
@@ -118,14 +117,6 @@ class FileRow(tk.Frame):
         self.status_badge.bind("<Leave>", self._hide_tooltip)
         self.status_badge.bind("<ButtonPress-1>", self._hide_tooltip)
 
-        self.save_button = ttk.Button(
-            self,
-            text="Save",
-            command=self._handle_save,
-            style="Secondary.TButton",
-        )
-        self.save_button.grid(row=0, column=3, rowspan=2, sticky="e", padx=(0, 8))
-
         self.saved_label = tk.Label(
             self,
             text="Saved",
@@ -133,7 +124,7 @@ class FileRow(tk.Frame):
             fg=SUCCESS_COLOR,
             bg=CONTENT_BACKGROUND,
         )
-        self.saved_label.grid(row=0, column=4, rowspan=2, sticky="e", padx=(0, 8))
+        self.saved_label.grid(row=0, column=3, rowspan=2, sticky="e", padx=(0, 8))
 
         self.remove_button = ttk.Button(
             self,
@@ -141,7 +132,7 @@ class FileRow(tk.Frame):
             command=self._handle_remove,
             style="Secondary.TButton",
         )
-        self.remove_button.grid(row=0, column=5, rowspan=2, sticky="e")
+        self.remove_button.grid(row=0, column=4, rowspan=2, sticky="e")
 
         self.update_item(item)
 
@@ -160,11 +151,6 @@ class FileRow(tk.Frame):
             fg=badge_foreground,
         )
 
-        if item.is_converted:
-            self.save_button.grid()
-        else:
-            self.save_button.grid_remove()
-
         if item.was_saved:
             self.saved_label.grid()
         else:
@@ -176,13 +162,9 @@ class FileRow(tk.Frame):
     def set_busy(self, is_busy: bool) -> None:
         self.is_busy = is_busy
         self.remove_button.configure(state="disabled" if is_busy else "normal")
-        self.save_button.configure(state="disabled" if is_busy or not self.item.is_converted else "normal")
 
     def _handle_remove(self) -> None:
         self.on_remove(self.item.path)
-
-    def _handle_save(self) -> None:
-        self.on_save(self.item.path)
 
     def _show_tooltip(self, _event: tk.Event) -> None:
         if not self.tooltip_text or self.tooltip_window is not None:

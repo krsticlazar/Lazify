@@ -190,21 +190,13 @@ class LazifyApp(BaseWindow):
         )
         self.progress_label.grid(row=1, column=0, sticky="w", pady=(4, 0))
 
-        self.save_all_button = ttk.Button(
-            actions,
-            text="SaveAll",
-            command=self._save_all,
-            style="Secondary.TButton",
-        )
-        self.save_all_button.grid(row=0, column=2, sticky="e", padx=(0, 8))
-
         self.convert_button = ttk.Button(
             actions,
-            text="Convert All",
+            text="Convert All and Save",
             command=self._convert_all,
             style="Primary.TButton",
         )
-        self.convert_button.grid(row=0, column=3, sticky="e")
+        self.convert_button.grid(row=0, column=2, sticky="e")
 
         tk.Label(
             self,
@@ -269,7 +261,6 @@ class LazifyApp(BaseWindow):
                 self.rows_container,
                 item=item,
                 on_remove=self._remove_file,
-                on_save=self._save_file,
             )
             row.pack(fill="x", pady=(0, 10))
             self.rows[key] = row
@@ -353,19 +344,22 @@ class LazifyApp(BaseWindow):
             self.rows[str(item.path)].update_item(item)
 
         self._refresh_actions()
-        self._set_status(f"Converting {self.run_total} file{'s' if self.run_total != 1 else ''}...")
+        self._set_status(f"Converting and saving {self.run_total} file{'s' if self.run_total != 1 else ''}...")
 
         source_paths = [Path(key) for key in self.items]
         threading.Thread(target=self._convert_worker, args=(source_paths,), daemon=True).start()
 
     def _convert_worker(self, source_paths: list[Path]) -> None:
         success_count = 0
+        reserved_paths: set[Path] = set()
 
         for path in source_paths:
             key = str(path)
             self.event_queue.put(("start", key, None))
             try:
                 markdown_text = self.converter.convert_file(path)
+                target_path = self._resolve_auto_save_path(path, reserved_paths)
+                saved_path = self.converter.save_markdown(path, markdown_text, target_path)
             except ConverterError as exc:
                 self.event_queue.put(("error", key, str(exc)))
                 continue
@@ -373,8 +367,9 @@ class LazifyApp(BaseWindow):
                 self.event_queue.put(("error", key, str(exc)))
                 continue
 
+            reserved_paths.add(saved_path.resolve())
             success_count += 1
-            self.event_queue.put(("success", key, markdown_text))
+            self.event_queue.put(("success", key, (markdown_text, saved_path)))
 
         self.event_queue.put(("complete", None, success_count))
 
@@ -391,13 +386,15 @@ class LazifyApp(BaseWindow):
                     continue
                 item.mark_converting()
                 self.rows[key].update_item(item)
-                self._set_status(f"Converting {item.name}...")
+                self._set_status(f"Converting and saving {item.name}...")
 
             elif event_type == "success" and key:
                 item = self.items.get(key)
                 if item is None:
                     continue
-                item.mark_success(str(payload or ""))
+                markdown_text, saved_path = payload
+                item.mark_success(str(markdown_text or ""))
+                item.mark_saved(Path(saved_path))
                 self.rows[key].update_item(item)
                 self._mark_progress(success=True)
 
@@ -415,11 +412,11 @@ class LazifyApp(BaseWindow):
                 self._refresh_actions()
 
                 if success_count == self.run_total:
-                    self._set_status(f"{success_count} file{'s' if success_count != 1 else ''} converted successfully.")
+                    self._set_status(f"{success_count} file{'s' if success_count != 1 else ''} converted and saved successfully.")
                 elif success_count == 0:
-                    self._set_status("No files were converted successfully.")
+                    self._set_status("No files were converted and saved successfully.")
                 else:
-                    self._set_status(f"Converted {success_count} of {self.run_total} files successfully.")
+                    self._set_status(f"Converted and saved {success_count} of {self.run_total} files successfully.")
 
         self.after(QUEUE_POLL_MS, self._drain_events)
 
@@ -431,83 +428,12 @@ class LazifyApp(BaseWindow):
         self.progress_bar.configure(value=self.run_completed)
         self.progress_label.configure(text=f"{self.run_completed} / {self.run_total} complete")
 
-    def _save_file(self, source_path: Path) -> None:
-        key = str(source_path.resolve())
-        item = self.items.get(key)
-        if item is None or not item.is_converted:
-            return
-
-        suggested_path = Path(item.saved_path).resolve() if item.was_saved and item.saved_path else self.converter.suggest_output_path(item.path)
-
-        target_path = filedialog.asksaveasfilename(
-            title=f"Save Markdown for {item.name}",
-            initialdir=str(suggested_path.parent),
-            initialfile=suggested_path.name,
-            defaultextension=".md",
-            filetypes=[
-                ("Markdown files", "*.md"),
-                ("All files", "*.*"),
-            ],
-        )
-        if not target_path:
-            return
-
-        try:
-            saved_path = self.converter.save_markdown(item.path, item.markdown_text, target_path)
-        except ConverterError as exc:
-            messagebox.showerror(title="Save failed", message=str(exc), parent=self)
-            self._set_status(f"Could not save {item.name}.")
-            return
-
-        item.mark_saved(saved_path)
-        self.rows[key].update_item(item)
-        self._refresh_actions()
-        self._set_status(f"Saved {saved_path.name}.")
-
-    def _save_all(self) -> None:
-        converted_items = [item for item in self.items.values() if item.is_converted]
-        if not converted_items:
-            if self.items:
-                self._set_status("Convert files first, then click SaveAll to save the Markdown files.")
-            else:
-                self._set_status("Add files first, then convert them before using SaveAll.")
-            return
-
-        saved_count = 0
-        failed_count = 0
-        reserved_paths: set[Path] = set()
-
-        for item in converted_items:
-            if item.was_saved and item.saved_path:
-                target_path = Path(item.saved_path).resolve()
-            else:
-                target_path = self.converter.suggest_output_path(item.path, reserved_paths=reserved_paths)
-
-            try:
-                saved_path = self.converter.save_markdown(item.path, item.markdown_text, target_path)
-            except ConverterError:
-                failed_count += 1
-                continue
-
-            item.mark_saved(saved_path)
-            reserved_paths.add(saved_path.resolve())
-            self.rows[str(item.path)].update_item(item)
-            saved_count += 1
-
-        self._refresh_actions()
-        if failed_count:
-            self._set_status(f"Saved {saved_count} file{'s' if saved_count != 1 else ''}, {failed_count} failed.")
-        else:
-            self._set_status(f"Saved {saved_count} file{'s' if saved_count != 1 else ''}.")
-
     def _refresh_actions(self) -> None:
         has_items = bool(self.items)
-        has_converted = any(item.is_converted for item in self.items.values())
 
         self.add_button.configure(state="disabled" if self.is_converting else "normal")
         self.convert_button.configure(state="disabled" if self.is_converting or not has_items else "normal")
         self.clear_button.configure(state="disabled" if self.is_converting or not has_items else "normal")
-        self.save_all_button.configure(state="disabled" if self.is_converting else "normal")
 
         self.drop_zone.set_busy(self.is_converting)
         for row in self.rows.values():
@@ -547,6 +473,12 @@ class LazifyApp(BaseWindow):
         if self.list_canvas.winfo_height() >= self.rows_container.winfo_height():
             return
         self.list_canvas.yview_scroll(int(-event.delta / 120), "units")
+
+    def _resolve_auto_save_path(self, source_path: Path, reserved_paths: set[Path]) -> Path:
+        default_path = self.converter.default_output_path(source_path)
+        if default_path.resolve() not in reserved_paths:
+            return default_path
+        return self.converter.suggest_output_path(source_path, reserved_paths=reserved_paths)
 
     def _set_status(self, message: str) -> None:
         self.status_var.set(message)
