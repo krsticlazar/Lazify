@@ -2,6 +2,16 @@
 
 Lazify is a lightweight Windows desktop app that converts `PDF`, `DOCX`, and `PPTX` files into Markdown.
 
+[![Download for Windows](https://img.shields.io/badge/Download-Windows%20Installer-2ea44f?style=for-the-badge&logo=windows)](https://github.com/krsticlazar/Lazify/releases/latest/download/Lazify-Setup.exe)
+
+Download the latest installer directly:
+
+**[Download Lazify for Windows](https://github.com/krsticlazar/Lazify/releases/latest/download/Lazify-Setup.exe)**
+
+Alternative link:
+
+- [View all releases](https://github.com/krsticlazar/Lazify/releases)
+
 ## What It Does
 
 - Accepts `PDF`, `DOCX`, and `PPTX` files
