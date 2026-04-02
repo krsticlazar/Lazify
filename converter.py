@@ -36,6 +36,29 @@ class FileConverter:
     def is_supported(self, source_path: str | Path) -> bool:
         return Path(source_path).suffix.lower() in SUPPORTED_EXTENSIONS
 
+    def default_output_path(self, source_path: str | Path) -> Path:
+        source = Path(source_path).expanduser().resolve()
+        return source.with_suffix(".md")
+
+    def suggest_output_path(
+        self,
+        source_path: str | Path,
+        reserved_paths: set[Path] | None = None,
+    ) -> Path:
+        candidate = self.default_output_path(source_path)
+        reserved = {Path(path).resolve() for path in (reserved_paths or set())}
+
+        if candidate.resolve() not in reserved and not candidate.exists():
+            return candidate
+
+        counter = 1
+        while True:
+            fallback = candidate.with_name(f"{candidate.stem} ({counter}){candidate.suffix}")
+            resolved_fallback = fallback.resolve()
+            if resolved_fallback not in reserved and not fallback.exists():
+                return fallback
+            counter += 1
+
     def convert_file(self, source_path: str | Path) -> str:
         path = Path(source_path).expanduser().resolve()
         self._validate_source(path)
@@ -57,7 +80,7 @@ class FileConverter:
         target_path: str | Path | None = None,
     ) -> Path:
         source = Path(source_path).expanduser().resolve()
-        destination = Path(target_path).expanduser().resolve() if target_path else source.with_suffix(".md")
+        destination = Path(target_path).expanduser().resolve() if target_path else self.default_output_path(source)
 
         try:
             destination.parent.mkdir(parents=True, exist_ok=True)

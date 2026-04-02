@@ -1,0 +1,3 @@
+markitdown[docx,pdf,pptx,xlsx]
+tkinterdnd2
+pyinstaller

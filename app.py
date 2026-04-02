@@ -436,10 +436,12 @@ class LazifyApp(BaseWindow):
         if item is None or not item.is_converted:
             return
 
+        suggested_path = Path(item.saved_path).resolve() if item.was_saved and item.saved_path else self.converter.suggest_output_path(item.path)
+
         target_path = filedialog.asksaveasfilename(
             title=f"Save Markdown for {item.name}",
-            initialdir=str(item.path.parent),
-            initialfile=item.default_save_path.name,
+            initialdir=str(suggested_path.parent),
+            initialfile=suggested_path.name,
             defaultextension=".md",
             filetypes=[
                 ("Markdown files", "*.md"),
@@ -468,15 +470,22 @@ class LazifyApp(BaseWindow):
 
         saved_count = 0
         failed_count = 0
+        reserved_paths: set[Path] = set()
 
         for item in converted_items:
+            if item.was_saved and item.saved_path:
+                target_path = Path(item.saved_path).resolve()
+            else:
+                target_path = self.converter.suggest_output_path(item.path, reserved_paths=reserved_paths)
+
             try:
-                saved_path = self.converter.save_markdown(item.path, item.markdown_text)
+                saved_path = self.converter.save_markdown(item.path, item.markdown_text, target_path)
             except ConverterError:
                 failed_count += 1
                 continue
 
             item.mark_saved(saved_path)
+            reserved_paths.add(saved_path.resolve())
             self.rows[str(item.path)].update_item(item)
             saved_count += 1
 
