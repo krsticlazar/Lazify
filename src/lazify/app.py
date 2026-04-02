@@ -192,7 +192,7 @@ class LazifyApp(BaseWindow):
 
         self.save_all_button = ttk.Button(
             actions,
-            text="Save All",
+            text="SaveAll",
             command=self._save_all,
             style="Secondary.TButton",
         )
@@ -467,6 +467,10 @@ class LazifyApp(BaseWindow):
     def _save_all(self) -> None:
         converted_items = [item for item in self.items.values() if item.is_converted]
         if not converted_items:
+            if self.items:
+                self._set_status("Convert files first, then click SaveAll to save the Markdown files.")
+            else:
+                self._set_status("Add files first, then convert them before using SaveAll.")
             return
 
         saved_count = 0
@@ -503,12 +507,7 @@ class LazifyApp(BaseWindow):
         self.add_button.configure(state="disabled" if self.is_converting else "normal")
         self.convert_button.configure(state="disabled" if self.is_converting or not has_items else "normal")
         self.clear_button.configure(state="disabled" if self.is_converting or not has_items else "normal")
-        self.save_all_button.configure(state="disabled" if self.is_converting or not has_converted else "normal")
-
-        if has_converted:
-            self.save_all_button.grid()
-        else:
-            self.save_all_button.grid_remove()
+        self.save_all_button.configure(state="disabled" if self.is_converting else "normal")
 
         self.drop_zone.set_busy(self.is_converting)
         for row in self.rows.values():
