@@ -6,11 +6,12 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-from converter import ConverterError, FileConverter, SUPPORTED_EXTENSIONS
-from file_item import FileItem
-from ui.drop_zone import DropZone
-from ui.file_row import FileRow
-from ui.styles import (
+from lazify.converter import ConverterError, FileConverter, SUPPORTED_EXTENSIONS
+from lazify.file_item import FileItem
+from lazify.resources import icon_path
+from lazify.ui.drop_zone import DropZone
+from lazify.ui.file_row import FileRow
+from lazify.ui.styles import (
     APP_BACKGROUND,
     BORDER_COLOR,
     CONTENT_BACKGROUND,
@@ -61,10 +62,10 @@ class LazifyApp(BaseWindow):
         self.after(QUEUE_POLL_MS, self._drain_events)
 
     def _set_icon(self) -> None:
-        icon_path = Path(__file__).resolve().parent / "assets" / "icon.ico"
-        if icon_path.exists():
+        icon_file = icon_path()
+        if icon_file.exists():
             try:
-                self.iconbitmap(default=str(icon_path))
+                self.iconbitmap(default=str(icon_file))
             except tk.TclError:
                 pass
 

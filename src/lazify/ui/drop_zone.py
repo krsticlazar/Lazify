@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import tkinter as tk
 
-from ui.styles import (
+from lazify.ui.styles import (
     ACCENT_COLOR,
     APP_BACKGROUND,
     BORDER_COLOR,

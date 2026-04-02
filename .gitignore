@@ -3,3 +3,6 @@ __pycache__/
 *.spec
 build/
 dist/
+build-output.txt
+promt-ideja.txt
+lazify.ico

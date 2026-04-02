@@ -3,14 +3,14 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 
-from file_item import (
+from lazify.file_item import (
     STATUS_CONVERTING,
     STATUS_ERROR,
     STATUS_PENDING,
     STATUS_SUCCESS,
     FileItem,
 )
-from ui.styles import (
+from lazify.ui.styles import (
     ACCENT_COLOR,
     ACCENT_SOFT,
     BORDER_COLOR,

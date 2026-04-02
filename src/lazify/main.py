@@ -1,4 +1,4 @@
-from app import LazifyApp
+from lazify.app import LazifyApp
 
 
 def main() -> None:
