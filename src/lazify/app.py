@@ -29,7 +29,7 @@ except ImportError:
     TkinterDnD = None
 
 
-WINDOW_HEIGHT = 520
+WINDOW_HEIGHT = 560
 WINDOW_WIDTH = 720
 TITLE = "Lazify"
 SUBTITLE = "File -> Markdown Converter"
@@ -49,7 +49,9 @@ class LazifyApp(BaseWindow):
         self.run_completed = 0
         self.run_successes = 0
         self.mousewheel_bound = False
+        self.output_directory: Path | None = None
         self.status_var = tk.StringVar(value="Ready")
+        self.output_location_var = tk.StringVar()
 
         self.title(TITLE)
         self.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
@@ -99,13 +101,59 @@ class LazifyApp(BaseWindow):
         )
         content.grid(row=1, column=0, sticky="nsew", padx=24, pady=(0, 16))
         content.columnconfigure(0, weight=1)
-        content.rowconfigure(1, weight=1)
+        content.rowconfigure(2, weight=1)
 
         self.drop_zone = DropZone(content, on_browse=self._browse_files, on_files=self._add_files)
         self.drop_zone.grid(row=0, column=0, sticky="ew", padx=20, pady=(20, 12))
 
+        destination_frame = tk.Frame(
+            content,
+            bg=CONTENT_BACKGROUND,
+            highlightthickness=1,
+            highlightbackground=BORDER_COLOR,
+            padx=14,
+            pady=12,
+        )
+        destination_frame.grid(row=1, column=0, sticky="ew", padx=20, pady=(0, 12))
+        destination_frame.columnconfigure(0, weight=1)
+
+        tk.Label(
+            destination_frame,
+            text="Save location",
+            font=("Segoe UI Semibold", 9),
+            fg=TEXT_PRIMARY,
+            bg=CONTENT_BACKGROUND,
+        ).grid(row=0, column=0, sticky="w")
+
+        self.output_location_label = tk.Label(
+            destination_frame,
+            textvariable=self.output_location_var,
+            font=("Segoe UI", 9),
+            fg=TEXT_SECONDARY,
+            bg=CONTENT_BACKGROUND,
+            justify="left",
+            wraplength=430,
+        )
+        self.output_location_label.grid(row=1, column=0, sticky="ew", pady=(4, 0), padx=(0, 12))
+
+        self.reset_output_button = ttk.Button(
+            destination_frame,
+            text="Use Source Folder",
+            command=self._use_source_folder,
+            style="Secondary.TButton",
+        )
+        self.reset_output_button.grid(row=0, column=1, rowspan=2, sticky="e", padx=(0, 8))
+
+        self.change_output_button = ttk.Button(
+            destination_frame,
+            text="Change Address",
+            command=self._choose_output_directory,
+            style="Secondary.TButton",
+        )
+        self.change_output_button.grid(row=0, column=2, rowspan=2, sticky="e")
+
         list_shell = tk.Frame(content, bg=CONTENT_BACKGROUND)
-        list_shell.grid(row=1, column=0, sticky="nsew", padx=20)
+        list_shell.grid(row=2, column=0, sticky="nsew", padx=20)
         list_shell.columnconfigure(0, weight=1)
         list_shell.rowconfigure(0, weight=1)
 
@@ -146,7 +194,7 @@ class LazifyApp(BaseWindow):
         self.empty_state.pack(fill="x")
 
         footer = tk.Frame(content, bg=CONTENT_BACKGROUND)
-        footer.grid(row=2, column=0, sticky="ew", padx=20, pady=(12, 18))
+        footer.grid(row=3, column=0, sticky="ew", padx=20, pady=(12, 18))
         footer.columnconfigure(0, weight=1)
 
         self.clear_button = ttk.Button(
@@ -209,6 +257,7 @@ class LazifyApp(BaseWindow):
             pady=10,
         ).grid(row=3, column=0, sticky="ew")
 
+        self._refresh_output_location()
         self._refresh_actions()
 
     def _browse_files(self) -> None:
@@ -267,6 +316,7 @@ class LazifyApp(BaseWindow):
             added_count += 1
 
         self._refresh_empty_state()
+        self._refresh_output_location()
         self._refresh_actions()
 
         messages: list[str] = []
@@ -294,6 +344,7 @@ class LazifyApp(BaseWindow):
             row.destroy()
 
         self._refresh_empty_state()
+        self._refresh_output_location()
         self._refresh_actions()
 
         if item is not None:
@@ -322,6 +373,7 @@ class LazifyApp(BaseWindow):
         self.rows.clear()
         self._reset_progress()
         self._refresh_empty_state()
+        self._refresh_output_location()
         self._refresh_actions()
         self._set_status("Cleared all files.")
 
@@ -434,6 +486,8 @@ class LazifyApp(BaseWindow):
         self.add_button.configure(state="disabled" if self.is_converting else "normal")
         self.convert_button.configure(state="disabled" if self.is_converting or not has_items else "normal")
         self.clear_button.configure(state="disabled" if self.is_converting or not has_items else "normal")
+        self.change_output_button.configure(state="disabled" if self.is_converting else "normal")
+        self.reset_output_button.configure(state="disabled" if self.is_converting else "normal")
 
         self.drop_zone.set_busy(self.is_converting)
         for row in self.rows.values():
@@ -475,10 +529,67 @@ class LazifyApp(BaseWindow):
         self.list_canvas.yview_scroll(int(-event.delta / 120), "units")
 
     def _resolve_auto_save_path(self, source_path: Path, reserved_paths: set[Path]) -> Path:
-        default_path = self.converter.default_output_path(source_path)
-        if default_path.resolve() not in reserved_paths:
+        default_path = self.converter.default_output_path(
+            source_path,
+            output_directory=self.output_directory,
+        )
+        if default_path.resolve() not in reserved_paths and not default_path.exists():
             return default_path
-        return self.converter.suggest_output_path(source_path, reserved_paths=reserved_paths)
+        return self.converter.suggest_output_path(
+            source_path,
+            reserved_paths=reserved_paths,
+            output_directory=self.output_directory,
+        )
 
     def _set_status(self, message: str) -> None:
         self.status_var.set(message)
+
+    def _choose_output_directory(self) -> None:
+        if self.is_converting:
+            return
+
+        selected_directory = filedialog.askdirectory(
+            title="Select a folder for saved Markdown files",
+            initialdir=self._initial_output_directory(),
+            mustexist=True,
+            parent=self,
+        )
+        if not selected_directory:
+            return
+
+        self.output_directory = Path(selected_directory).expanduser().resolve()
+        self._refresh_output_location()
+        self._set_status(f"Markdown files will be saved to {self.output_directory}.")
+
+    def _use_source_folder(self) -> None:
+        if self.is_converting or self.output_directory is None:
+            return
+
+        self.output_directory = None
+        self._refresh_output_location()
+        self._set_status("Markdown files will be saved next to each source file.")
+
+    def _initial_output_directory(self) -> str:
+        if self.output_directory is not None:
+            return str(self.output_directory)
+        if self.items:
+            first_item = next(iter(self.items.values()))
+            return str(first_item.path.parent)
+        return str(Path.home())
+
+    def _refresh_output_location(self) -> None:
+        if self.output_directory is None:
+            self.output_location_var.set(self._default_location_text())
+            self.reset_output_button.grid_remove()
+        else:
+            self.output_location_var.set(str(self.output_directory))
+            self.reset_output_button.grid()
+
+    def _default_location_text(self) -> str:
+        if not self.items:
+            return "Same folder as each source file (default)"
+
+        source_directories = {item.path.parent for item in self.items.values()}
+        if len(source_directories) == 1:
+            return f"Same as source file: {next(iter(source_directories))}"
+        return "Same folder as each source file (multiple source folders)"

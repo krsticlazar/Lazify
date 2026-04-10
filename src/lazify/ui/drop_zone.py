@@ -46,7 +46,7 @@ class DropZone(tk.Frame):
 
         self.subtitle_label = tk.Label(
             self,
-            text="Supports PDF, DOCX and PPTX",
+            text="Supports PDF, DOCX, PPT and PPTX",
             font=("Segoe UI", 9),
             fg=TEXT_SECONDARY,
             bg=CONTENT_ALT_BACKGROUND,

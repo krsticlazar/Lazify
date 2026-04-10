@@ -1,0 +1,61 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package
+    Name="Lazify"
+    Manufacturer="Lazify"
+    Version="1.1.0"
+    Language="1033"
+    UpgradeCode="F8F73C0B-4F82-4FC7-88A9-2F1D471090C3"
+    Scope="perMachine"
+    InstallerVersion="500">
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Lazify is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Icon Id="AppIcon" SourceFile="assets\lazify.ico" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+
+    <WixVariable Id="WixUILicenseRtf" Value="installer\License.rtf" />
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Lazify" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ProgramMenuLazifyFolder" Name="Lazify" />
+    </StandardDirectory>
+
+    <Feature Id="MainFeature" Title="Lazify" Level="1" Display="hidden">
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentGroupRef Id="ShortcutComponents" />
+    </Feature>
+  </Package>
+
+  <Fragment>
+    <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
+      <Files Include="!(bindpath.AppFiles)\**" />
+    </ComponentGroup>
+  </Fragment>
+
+  <Fragment>
+    <ComponentGroup Id="ShortcutComponents">
+      <Component Id="StartMenuShortcutComponent" Directory="ProgramMenuLazifyFolder">
+        <Shortcut
+          Id="StartMenuShortcut"
+          Name="Lazify"
+          Description="Convert PDF, DOCX, PPT, and PPTX files to Markdown."
+          Target="[INSTALLFOLDER]Lazify.exe"
+          WorkingDirectory="INSTALLFOLDER" />
+        <RemoveFolder Id="RemoveProgramMenuLazifyFolder" On="uninstall" />
+        <RegistryValue
+          Root="HKLM"
+          Key="Software\Lazify"
+          Name="Installed"
+          Type="integer"
+          Value="1"
+          KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+</Wix>

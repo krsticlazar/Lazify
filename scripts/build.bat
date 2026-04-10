@@ -3,8 +3,7 @@ setlocal
 
 cd /d "%~dp0\.."
 set "ICON_PATH=%CD%\assets\lazify.ico"
-set "ISCC_EXE=%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"
-if not exist "%ISCC_EXE%" set "ISCC_EXE=%ProgramFiles%\Inno Setup 6\ISCC.exe"
+set "WIX_EXE=%USERPROFILE%\.dotnet\tools\wix.exe"
 
 echo Installing dependencies...
 python -m pip install -r scripts\requirements.txt
@@ -35,17 +34,31 @@ python -m PyInstaller ^
   src\main.py
 if errorlevel 1 exit /b 1
 
-if exist "%ISCC_EXE%" (
-  echo Building installer...
-  "%ISCC_EXE%" installer\Lazify.iss
+if exist "%WIX_EXE%" (
+  echo Preparing WiX...
+  "%WIX_EXE%" eula accept wix7 >nul 2>&1
+  "%WIX_EXE%" extension list -g | findstr /I /C:"WixToolset.UI.wixext" >nul
+  if errorlevel 1 (
+    "%WIX_EXE%" extension add -g WixToolset.UI.wixext
+    if errorlevel 1 exit /b 1
+  )
+
+  echo Building MSI installer...
+  "%WIX_EXE%" build ^
+    -arch x64 ^
+    -bindpath AppFiles="%CD%\dist\Lazify" ^
+    -ext WixToolset.UI.wixext ^
+    -intermediatefolder build\wix ^
+    installer\Lazify.wxs ^
+    -out dist\installer\Lazify-Setup.msi
   if errorlevel 1 exit /b 1
 ) else (
-  echo Inno Setup was not found. Application package was built, but the installer was skipped.
+  echo WiX was not found. Application package was built, but the MSI installer was skipped.
 )
 
 echo Build complete.
 echo App package: dist\Lazify\Lazify.exe
-if exist dist\installer\Lazify-Setup.exe echo Installer: dist\installer\Lazify-Setup.exe
+if exist dist\installer\Lazify-Setup.msi echo Installer: dist\installer\Lazify-Setup.msi
 
 endlocal
 exit /b 0

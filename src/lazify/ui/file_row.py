@@ -31,6 +31,7 @@ from lazify.ui.styles import (
 ICON_BY_EXTENSION = {
     ".pdf": "PDF",
     ".docx": "DOC",
+    ".ppt": "PPT",
     ".pptx": "PPT",
 }
 

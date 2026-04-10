@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
 
 import mammoth
@@ -10,6 +13,7 @@ from pptx import Presentation
 SUPPORTED_EXTENSIONS = {
     ".pdf",
     ".docx",
+    ".ppt",
     ".pptx",
 }
 
@@ -26,16 +30,24 @@ class FileConverter:
     def is_supported(self, source_path: str | Path) -> bool:
         return Path(source_path).suffix.lower() in SUPPORTED_EXTENSIONS
 
-    def default_output_path(self, source_path: str | Path) -> Path:
+    def default_output_path(
+        self,
+        source_path: str | Path,
+        output_directory: str | Path | None = None,
+    ) -> Path:
         source = Path(source_path).expanduser().resolve()
+        if output_directory:
+            target_directory = Path(output_directory).expanduser().resolve()
+            return target_directory / f"{source.stem}.md"
         return source.with_suffix(".md")
 
     def suggest_output_path(
         self,
         source_path: str | Path,
         reserved_paths: set[Path] | None = None,
+        output_directory: str | Path | None = None,
     ) -> Path:
-        candidate = self.default_output_path(source_path)
+        candidate = self.default_output_path(source_path, output_directory=output_directory)
         reserved = {Path(path).resolve() for path in (reserved_paths or set())}
 
         if candidate.resolve() not in reserved and not candidate.exists():
@@ -58,6 +70,8 @@ class FileConverter:
                 markdown_text = self._convert_pdf(path)
             elif path.suffix.lower() == ".docx":
                 markdown_text = self._convert_docx(path)
+            elif path.suffix.lower() == ".ppt":
+                markdown_text = self._convert_ppt(path)
             elif path.suffix.lower() == ".pptx":
                 markdown_text = self._convert_pptx(path)
             else:
@@ -108,6 +122,15 @@ class FileConverter:
             result = mammoth.convert_to_markdown(handle)
         return self._normalize_text(result.value)
 
+    def _convert_ppt(self, path: Path) -> str:
+        if sys.platform != "win32":
+            raise ConverterError(f"{path.name}: Legacy .ppt conversion is only available on Windows.")
+
+        with tempfile.TemporaryDirectory(prefix="lazify-ppt-") as temp_dir:
+            converted_path = Path(temp_dir) / f"{path.stem}.pptx"
+            self._export_ppt_to_pptx(path, converted_path)
+            return self._convert_pptx(converted_path)
+
     def _convert_pptx(self, path: Path) -> str:
         presentation = Presentation(str(path))
         sections: list[str] = []
@@ -135,6 +158,69 @@ class FileConverter:
 
         return "\n\n---\n\n".join(section for section in sections if section.strip())
 
+    def _export_ppt_to_pptx(self, source_path: Path, target_path: Path) -> None:
+        script = f"""
+$ErrorActionPreference = 'Stop'
+$source = {self._powershell_literal(source_path)}
+$target = {self._powershell_literal(target_path)}
+$powerpoint = $null
+$presentation = $null
+
+try {{
+    $powerpoint = New-Object -ComObject PowerPoint.Application
+    $presentation = $powerpoint.Presentations.Open($source, $true, $false, $false)
+    $presentation.SaveAs($target, 24)
+}}
+finally {{
+    if ($presentation -ne $null) {{
+        $presentation.Close()
+        [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($presentation)
+    }}
+    if ($powerpoint -ne $null) {{
+        $powerpoint.Quit()
+        [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($powerpoint)
+    }}
+    [System.GC]::Collect()
+    [System.GC]::WaitForPendingFinalizers()
+}}
+"""
+
+        try:
+            result = subprocess.run(
+                [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-Command",
+                    script,
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=180,
+            )
+        except OSError as exc:
+            raise ConverterError(f"{source_path.name}: Unable to launch PowerShell for legacy .ppt conversion.") from exc
+        except subprocess.TimeoutExpired as exc:
+            raise ConverterError(f"{source_path.name}: Timed out while converting the legacy .ppt file.") from exc
+
+        if result.returncode != 0:
+            details = "\n".join(part.strip() for part in (result.stderr, result.stdout) if part and part.strip())
+            lowered = details.lower()
+            if "powerpoint.application" in lowered or "class not registered" in lowered:
+                raise ConverterError(
+                    f"{source_path.name}: Legacy .ppt conversion requires Microsoft PowerPoint to be installed."
+                )
+
+            if details:
+                raise ConverterError(f"{source_path.name}: {details.splitlines()[0]}")
+            raise ConverterError(f"{source_path.name}: Legacy .ppt conversion failed.")
+
+        if not target_path.exists():
+            raise ConverterError(f"{source_path.name}: PowerPoint did not produce a .pptx export.")
+
     @staticmethod
     def _normalize_text(text: str) -> str:
         lines = [line.rstrip() for line in text.replace("\r\n", "\n").split("\n")]
@@ -160,3 +246,7 @@ class FileConverter:
         if not message:
             message = exc.__class__.__name__
         return f"{path.name}: {message}"
+
+    @staticmethod
+    def _powershell_literal(path: Path) -> str:
+        return "'" + str(path).replace("'", "''") + "'"
